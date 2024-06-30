@@ -22,7 +22,7 @@ A dict passed to confluent_kafka's consumer, so it should follow the
 format](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#pythonclient-configuration)
 except for group.id. It is automatically set. See
 [tests/helper_files/env.json](https://github.com/newvoll/kafkareport/blob/main/tests/helper_files/env.json)
-for a sample conf file. `-h` for help.
+for a sample conf file.
 
 > [!NOTE]
 > Tested only with `SASL_SSL` and `SCRAM_SHA_512` u/p on AWS MSK. See
@@ -30,6 +30,9 @@ for a sample conf file. `-h` for help.
 
 
 ## CLI
+
+ `-h` for help.
+
 ```
 % kafkareport ~/aws.json --csv report.csv
 +----------------+-------+----------------------------------+----------------------------------+--------------+-----------------+---------------------+
