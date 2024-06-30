@@ -43,6 +43,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.urls]
 Homepage = "https://github.com/newvoll/kafkareport"
-# Documentation = "https://readthedocs.org/projects/kafkareport/"
+Documentation = "https://kafkareport.readthedocs.io/en/latest/index.html"
 Repository = "https://github.com/newvoll/kafkareport"
 Issues = "https://github.com/newvoll/kafkareport/issues"
