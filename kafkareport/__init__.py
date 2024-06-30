@@ -9,17 +9,15 @@ import time
 from datetime import datetime, timezone
 from typing import Callable, Union
 
-# isort: off
 from confluent_kafka import (
     Consumer,
-    KafkaException,
-    TopicPartition,
     KafkaError,
+    KafkaException,
     Message,
+    TopicPartition,
 )
 from confluent_kafka.admin import RESOURCE_TOPIC, AdminClient, ConfigResource
 
-# isort: on
 from kafkareport import helpers, logdirs
 
 logger = logging.getLogger(__name__)
