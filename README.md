@@ -74,7 +74,6 @@ __consumer_offsets
 
 >>> report.watermarks("kafkareportuno")
 {'earliest': datetime.datetime(2024, 6, 30, 20, 8, 55, 975000, tzinfo=datetime.timezone.utc), 'latest': datetime.datetime(2024, 6, 30, 20, 8, 57, 503000, tzinfo=datetime.timezone.utc)}
-
 ```
 
 # Development
@@ -82,6 +81,8 @@ This is a [poetry](https://python-poetry.org/) project, so it should
 be butter once you get that sorted. Install
 [pre-commit](https://pre-commit.com/) for black on commit, lint on
 push. Couldn't figure `pytype` into `pre-commit`.
+
+`pre-commit install --hook-type pre-push` for lint pre-push.
 
 # Testing
 Testing uses [localstack](https://www.localstack.cloud/), as you can
@@ -95,7 +96,7 @@ localstack. This will manipulate pytest.topics on the kafka servers.
 ## Testing Gotchas
 * Occasionally, e.g. on laptop wake, the kafka container will be in a
   weird state. `docker-compose down --remove-orphans && docker-compose
-  up` and always did the trick.
+  up` always did the trick.
 
 # Addenda
 * Watermarks use a thread for each topic partition, but it can still take a while. `-v` for gory details along the way, `KafkaReport(debug=True)` for the lib.
