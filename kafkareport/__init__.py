@@ -30,10 +30,7 @@ logging.basicConfig(
 class KafkaReport:
     """The only class. TIMEOUT is default unless passed via kwargs.
 
-      :param conf: A dict passed to confluent_kafka's consumer, so it
-      should follow the `same format
-      <https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#pythonclient-configuration>`_,
-      except for group.id. It is automatically set.
+      :param conf: A dict passed to confluent_kafka's consumer, so it should follow the `same format <https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#pythonclient-configuration>`_, except for group.id. It is automatically set.
 
       :param debug: sets the logger level to DEBUG
 
@@ -56,7 +53,7 @@ class KafkaReport:
     report.topic_sizes()
 
     report.watermarks("kafkareportuno")
-    """
+    """  # pylint: disable=line-too-long
 
     _TIMEOUT = 30
 

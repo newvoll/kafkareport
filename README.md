@@ -8,6 +8,10 @@ Show any or all of the following attributes for each topic in a cluster:
 With larger teams and installations, misconfiguration often results in
 lots of resource waste. Auditing with this tool has helped.
 
+# Installation
+
+`pip install kafkareport`
+
 # Usage
 
 All times should be UTC.
