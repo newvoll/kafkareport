@@ -48,8 +48,9 @@ class KafkaReport:
     report.get_topicnames()
 
     for topic in report.get_topicnames():
-         print(topic)
+
          report.retentions(topic)
+
          report.watermarks(topic)
 
     report.topic_sizes()
