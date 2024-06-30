@@ -28,7 +28,7 @@ logging.basicConfig(
 
 
 class KafkaReport:
-    """The only class. TIMEOUT is default unless passed via kwargs.
+    """The only class. _TIMEOUT classvar is default unless passed via kwargs to the methods.
 
       :param conf: A dict passed to confluent_kafka's consumer, so it should follow the `same format <https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#pythonclient-configuration>`_, except for group.id. It is automatically set.
 
@@ -53,6 +53,7 @@ class KafkaReport:
     report.topic_sizes()
 
     report.watermarks("kafkareportuno")
+
     """  # pylint: disable=line-too-long
 
     _TIMEOUT = 30
