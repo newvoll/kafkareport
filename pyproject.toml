@@ -1,7 +1,9 @@
 [tool.poetry]
 name = "kafkareport"
+repository = "https://github.com/newvoll/kafkareport"
+homepage = "https://github.com/newvoll/kafkareport"
 version = "0.0.0"
-description = "kafa reporting tool"
+description = "Reporting tool for kafka topics with retentions, sizes, earliest and latest message timestamps"
 authors = ["olmouse <olmouse@newvoll.net>"]
 license = "MIT"
 readme = "README.md"
@@ -14,7 +16,6 @@ kafka-python = "^2.0.2"
 
 [tool.poetry.scripts]
 kafkareport = "kafkareport.cli:main"
-testo = "kafkareport.clitest:main"
 
 [tool.poetry.group.develop.dependencies]
 pytest = "^8.2.2"
@@ -23,6 +24,9 @@ pre-commit = "^3.7.1"
 isort = "^5.13.2"
 pylint = "^3.2.3"
 pytype = "^2024.4.11"
+
+[tool.isort]
+profile = "black"
 
 [tool.pylint]
 ignored-classes = ["pytest"]
@@ -34,3 +38,9 @@ inputs = ['kafkareport']
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.urls]
+Homepage = "https://github.com/newvoll/kafkareport"
+# Documentation = "https://readthedocs.org/projects/kafkareport/"
+Repository = "https://github.com/newvoll/kafkareport"
+Issues = "https://github.com/newvoll/kafkareport/issues"
