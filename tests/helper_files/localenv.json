@@ -1,0 +1,4 @@
+{
+    "bootstrap.servers": "localhost:9092",
+    "ssl.endpoint.identification.algorithm": "none"
+}

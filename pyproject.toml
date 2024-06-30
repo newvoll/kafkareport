@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "kafkareport"
+version = "0.0.0"
+description = "kafa reporting tool"
+authors = ["olmouse <olmouse@newvoll.net>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+prettytable = "^3.10.0"
+confluent_kafka = "^2.4.0"
+kafka-python = "^2.0.2"
+
+[tool.poetry.scripts]
+kafkareport = "kafkareport.cli:main"
+testo = "kafkareport.clitest:main"
+
+[tool.poetry.group.develop.dependencies]
+pytest = "^8.2.2"
+black = "^24.4.2"
+pre-commit = "^3.7.1"
+isort = "^5.13.2"
+pylint = "^3.2.3"
+pytype = "^2024.4.11"
+
+[tool.pylint]
+ignored-classes = ["pytest"]
+ignore-paths = '^docs/'
+
+[tool.pytype]
+inputs = ['kafkareport']
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
