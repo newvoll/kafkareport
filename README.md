@@ -44,6 +44,9 @@ kafkareportuno,2268,2024-06-30 20:04:42.880000+00:00,2024-06-30 20:04:44.431000+
 ```
 
 ## Lib
+
+[Docs](https://kafkareport.readthedocs.io/en/latest/kafkareport.html#module-kafkareport)
+
 ```
 >>> from kafkareport import KafkaReport
 
