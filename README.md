@@ -20,7 +20,9 @@ All times should be UTC.
 A dict passed to confluent_kafka's consumer, so it should follow the
 [same
 format](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#pythonclient-configuration)
-except for group.id. It is automatically set. See `tests/helper_files/env.json` for a sample conf file. `-h` for help.
+except for group.id. It is automatically set. See
+[tests/helper_files/env.json](https://github.com/newvoll/kafkareport/blob/main/tests/helper_files/env.json)
+for a sample conf file. `-h` for help.
 
 > [!NOTE]
 > Tested only with `SASL_SSL` and `SCRAM_SHA_512` u/p on AWS MSK. See
