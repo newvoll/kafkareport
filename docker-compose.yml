@@ -31,3 +31,14 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_JMX_PORT: 9101
       KAFKA_JMX_HOSTNAME: localhost
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--list", "--bootstrap-server",  "localhost:9092"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  dummy:
+    image: hello-world
+    depends_on:
+      broker:
+        condition: service_healthy
