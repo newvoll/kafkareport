@@ -45,7 +45,7 @@ jobs:
         run: docker compose up --detach
 
       - name: pytest
-        run: poetry run pytest
+        run: poetry install && poetry run pytest
 
       - name: Pylint
         run: |
