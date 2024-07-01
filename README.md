@@ -17,10 +17,10 @@ lots of resource waste. Auditing with this tool has helped.
 All times should be UTC.
 
 ## Configuration
-A dict passed to confluent_kafka's consumer, so it should follow the
+Json file of a dict passed to confluent_kafka's consumer, so it should follow the
 [same
 format](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#pythonclient-configuration)
-except for group.id. It is automatically set. See
+except for `group.id`. It is automatically set. See
 [tests/helper_files/env.json](https://github.com/newvoll/kafkareport/blob/main/tests/helper_files/env.json)
 for a sample conf file.
 
@@ -93,8 +93,8 @@ push. Couldn't figure `pytype` into `pre-commit`.
 `pre-commit install --hook-type pre-push` for lint pre-push.
 
 # Testing
-Testing uses [localstack](https://www.localstack.cloud/), as you can
-see in the [Github
+Testing runs against kafka/zookeper containers, as you can see in the
+[Github
 actions](https://github.com/newvoll/kafkareport/actions). `docker-compose
 up` should do the trick.
 
