@@ -1,5 +1,6 @@
 import os
 import sys
+from importlib.metadata import metadata, version
 
 sys.path.insert(0, os.path.abspath("../kafkareport/"))
 
@@ -14,7 +15,7 @@ sys.path.insert(0, os.path.abspath("../kafkareport/"))
 project = "kafkareport"
 copyright = "2024, olmouse"
 author = "olmouse"
-release = "0.0.0"
+release = version("kafkareport")
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
