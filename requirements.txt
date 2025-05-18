@@ -34,9 +34,9 @@ confluent-kafka==2.10.0 ; python_version >= "3.9" and python_version < "4.0" \
     --hash=sha256:ddb9400786eedd8a6c0cbcceaddb8329a2597f4c02dc72389e83859da47d22d6 \
     --hash=sha256:e7dd3a0607139ed3de4d3c511861ff8a84af0f04c47acb6c899f033540027c58 \
     --hash=sha256:ef5aad8c04c54fe6ef89dc08a4ba24a80be90b05bbbc3348370c1c51222e0a5e
-kafka-python==2.2.7 ; python_version >= "3.9" and python_version < "4.0" \
-    --hash=sha256:b3d5e094b06a6e0755f30feb8f164b290a646256e9d4f302e385121ba3312bc1 \
-    --hash=sha256:c3527d3543c5c932c8cec86726d2f7625c4cb059e9a6ad483088d007a6f66913
+kafka-python==2.0.2 ; python_version >= "3.9" and python_version < "4.0" \
+    --hash=sha256:04dfe7fea2b63726cd6f3e79a2d86e709d608d74406638c5da33a01d45a9d7e3 \
+    --hash=sha256:2d92418c7cb1c298fa6c7f0fb3519b520d0d7526ac6cb7ae2a4fc65a51a94b6e
 prettytable==3.16.0 ; python_version >= "3.9" and python_version < "4.0" \
     --hash=sha256:3c64b31719d961bf69c9a7e03d0c1e477320906a98da63952bc6698d6164ff57 \
     --hash=sha256:b5eccfabb82222f5aa46b798ff02a8452cf530a352c31bddfa29be41242863aa
