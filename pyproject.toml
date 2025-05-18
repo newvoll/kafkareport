@@ -2,7 +2,7 @@
 name = "kafkareport"
 repository = "https://github.com/newvoll/kafkareport"
 homepage = "https://github.com/newvoll/kafkareport"
-version = "0.0.2"
+version = "0.0.3"
 description = "Reporting tool for kafka topics with retentions, sizes, earliest and latest message timestamps"
 authors = ["olmouse <olmouse@newvoll.net>"]
 license = "MIT"
@@ -12,7 +12,7 @@ readme = "README.md"
 python = "^3.9"
 prettytable = "^3.10.0"
 confluent_kafka = "^2.4.0"
-kafka-python = "^2.0.2"
+kafka-python = "2.0.2"
 
 [tool.poetry.scripts]
 kafkareport = "kafkareport.cli:main"
