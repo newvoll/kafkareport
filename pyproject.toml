@@ -4,7 +4,7 @@ repository = "https://github.com/newvoll/kafkareport"
 homepage = "https://github.com/newvoll/kafkareport"
 version = "0.0.3"
 description = "Reporting tool for kafka topics with retentions, sizes, earliest and latest message timestamps"
-authors = ["olmouse <olmouse@newvoll.net>"]
+authors = ["uncertaininference <gituc@newvoll.net>"]
 license = "MIT"
 readme = "README.md"
 
