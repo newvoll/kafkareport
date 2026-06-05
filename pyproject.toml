@@ -13,6 +13,7 @@ python = "^3.11"
 prettytable = "^3.10.0"
 confluent_kafka = "^2.14.0"
 kafka-python = "^2.3.2"
+aws-msk-iam-sasl-signer-python = "^1.0.2"
 
 [tool.poetry.scripts]
 kafkareport = "kafkareport.cli:main"
@@ -26,7 +27,7 @@ ruff = "^0.15.16"
 mypy = "^2.1.0"
 
 [[tool.mypy.overrides]]
-module = ["kafka.*"]
+module = ["kafka.*", "boto3", "aws_msk_iam_sasl_signer"]
 ignore_missing_imports = true
 
 [tool.ruff]

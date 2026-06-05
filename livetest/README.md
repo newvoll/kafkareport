@@ -1,16 +1,21 @@
 # Live test against real MSK
 
 A throwaway MSK cluster + bastion for verifying `kafkareport` end-to-end before
-publishing. Provisioned MSK with SASL/SCRAM, since that's what `logdirs.py`
-currently supports.
+publishing. Two flavors, picked by which CFN template you deploy:
 
-**Costs roughly $280+/month at the default size (`kafka.m7g.large` × 2
-brokers + storage). Tear it down when you're done.**
+| Mode | Template | Auth | Cost (approx) |
+| --- | --- | --- | --- |
+| Provisioned | `msk.yaml` | SASL/SCRAM | **~$280+/month** at default size (`kafka.m7g.large` × 2 + storage) |
+| Serverless | `msk-iam.yaml` | IAM (`AWS_MSK_IAM`) | Per-partition-hour + traffic, no broker fee. Cheaper than provisioned, **not free** — an idle cluster still bills. |
+
+**Tear it down when you're done either way.**
 
 > [!WARNING]
-> LLM-created for throwaway smoke test. Use only on nonproduction accounts.
+> LLM-created for throwaway smoke tests. Use only on nonproduction accounts.
 
 ## Deploy
+
+### Provisioned (SCRAM)
 
 ```sh
 aws cloudformation deploy \
@@ -22,16 +27,31 @@ aws cloudformation deploy \
       KafkaPassword='<pick a 12+ char password>'
 ```
 
-MSK provisioning takes 15–25 minutes. Grab the outputs once it's done:
+MSK provisioning takes 15–25 minutes.
+
+### Serverless (IAM)
 
 ```sh
-aws cloudformation describe-stacks --stack-name kafkareport-livetest \
+aws cloudformation deploy \
+  --stack-name kafkareport-livetest-iam \
+  --template-file livetest/msk-iam.yaml \
+  --capabilities CAPABILITY_IAM
+```
+
+Serverless provisioning is usually faster (a few minutes).
+
+## Grab the outputs
+
+```sh
+aws cloudformation describe-stacks --stack-name <your-stack-name> \
   --query 'Stacks[0].Outputs' --output table
 ```
 
-You'll get a `ClusterArn` and a `BastionInstanceId`.
+You'll get a `ClusterArn` and a `BastionInstanceId` from either stack.
 
 ## Build the conf file
+
+### Provisioned (SCRAM)
 
 Get the SASL/SCRAM bootstrap broker string:
 
@@ -52,36 +72,64 @@ Make a `conf.json`:
 }
 ```
 
+### Serverless (IAM)
+
+Get the IAM bootstrap broker string:
+
+```sh
+aws kafka get-bootstrap-brokers --cluster-arn <ClusterArn> \
+  --query BootstrapBrokerStringSaslIam --output text
+```
+
+Make a `conf.json` — note the `AWS_MSK_IAM` sentinel; no user/pass:
+
+```json
+{
+  "bootstrap.servers": "<the BootstrapBrokerStringSaslIam value>",
+  "sasl.mechanism": "AWS_MSK_IAM"
+}
+```
+
+Credentials come from the default AWS chain. On the bastion that's the
+instance profile (which the IAM stack grants `kafka-cluster:*` on the
+cluster's topics and groups). Region comes from boto3's resolver —
+`AWS_REGION` env or `~/.aws/config`; on EC2 it can also resolve from
+IMDS, but exporting `AWS_REGION` explicitly is more predictable.
+
 ## Run from the bastion
 
-The MSK brokers live in private subnets. Easiest way in is the bastion the
-stack provisioned, via SSM (no SSH key needed):
+The MSK brokers / serverless endpoints live in private subnets. Easiest way in
+is the bastion the stack provisioned, via SSM (no SSH key needed):
 
 ```sh
 aws ssm start-session --target <BastionInstanceId>
 ```
 
-On the bastion:
+On the bastion (user-data installs `git`, `python3.14`, and `pip3.14` at
+launch — if the first command fails, `cloud-init status --wait` and retry):
 
 ```sh
-sudo dnf install -y git python3.14 python3.14-pip
 git clone https://github.com/newvoll/kafkareport
 cd kafkareport
-pip install --user .
+pip3.14 install --user .
 # copy conf.json onto the box however you like (paste into nano, scp via SSM, etc.)
+# for IAM only: export AWS_REGION=<your region>
 python3.14 livetest/populate.py conf.json
 kafkareport conf.json
 ```
 
 The populate script creates three topics (`kafkareport-small`, `-medium`,
 `-large`) with varied partition counts, retentions, and message sizes so the
-reports show meaningful differences.
+reports show meaningful differences. It runs the same way against either
+auth mode — the `AWS_MSK_IAM` sentinel is translated by `kafkareport.auth`
+before the producer/admin client are built.
 
 ## Teardown
 
 ```sh
-aws cloudformation delete-stack --stack-name kafkareport-livetest
+aws cloudformation delete-stack --stack-name <your-stack-name>
 ```
 
-This deletes the cluster, bastion, VPC, KMS key, and secret. The KMS key is
-scheduled for deletion (7 day default window); the rest goes immediately.
+This deletes the cluster, bastion, VPC, and (for SCRAM) the KMS key and
+secret. The KMS key is scheduled for deletion (7 day default window); the
+rest goes immediately.

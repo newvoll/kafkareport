@@ -25,8 +25,27 @@ except for `group.id`. It is automatically set. See
 for a sample conf file.
 
 > [!NOTE]
-> Tested only with `SASL_SSL` and `SCRAM_SHA_512` u/p on AWS MSK. See
-> [Addenda](#Addenda) for details
+> Tested only with `SASL_SSL` + `SCRAM_SHA_512` u/p on AWS MSK
+> provisioned, and `AWS_MSK_IAM` on MSK Serverless. See
+> [Addenda](#Addenda) for details.
+
+### AWS MSK IAM
+
+Set `sasl.mechanism` to the sentinel `AWS_MSK_IAM` and drop the
+`sasl.username` / `sasl.password` keys:
+
+```json
+{
+    "bootstrap.servers": "boot-xxxx.kafka-serverless.us-east-1.amazonaws.com:9098",
+    "sasl.mechanism": "AWS_MSK_IAM"
+}
+```
+
+Credentials come from the default AWS chain (env, profile, instance
+profile). Region resolves from `AWS_REGION` / `AWS_DEFAULT_REGION` /
+`~/.aws/config`. `KafkaReport(debug=True)` also flips the signer's
+credential-debug, which logs the IAM principal actually in use — handy
+when access is denied.
 
 
 ## CLI
@@ -123,5 +142,10 @@ localstack. This will manipulate pytest.topics on the kafka servers.
   ships, `logdirs.py` monkey-patches a per-broker wrapper onto
   `KafkaAdminClient.describe_log_dirs`.
   - As a result, there is a janky confluent_kafka to kafka-python
-    AdminClient conf map in `logdirs.doit()`. It's only tested for
-    sasl auth in MSK on AWS.
+    AdminClient conf map, now lifted into `kafkareport/auth.py` since
+    IAM doubled its complexity. It handles plaintext, SCRAM, and the
+    `AWS_MSK_IAM` sentinel (translated to `OAUTHBEARER` + an MSK
+    signer-backed token provider for kafka-python and an `oauth_cb`
+    for confluent_kafka). Tested manually against MSK provisioned
+    (SCRAM) and MSK Serverless (IAM); CI runs against plaintext docker
+    only.
