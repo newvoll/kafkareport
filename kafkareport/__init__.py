@@ -6,8 +6,9 @@ import os
 import sys
 import threading
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Callable, Union
+from typing import Union
 
 from confluent_kafka import (
     Consumer,
@@ -59,7 +60,7 @@ class KafkaReport:
     _TIMEOUT = 30
 
     def __init__(
-        self, conf: dict[str, Union[str, bool, Callable]], debug: bool = False
+        self, conf: dict[str, str | bool | Callable], debug: bool = False
     ):
         self.debug = debug
         if self.debug:
@@ -248,7 +249,7 @@ class KafkaReport:
         """
         return self.admin.list_topics(timeout=timeout).topics.keys()
 
-    def topic_sizes(self) -> list[dict[str, Union[str, int]]]:
+    def topic_sizes(self) -> list[dict[str, str | int]]:
         """Retrieves the size each topic takes up on the servers.
 
         :param timeout: Seconds to wait for timeout.

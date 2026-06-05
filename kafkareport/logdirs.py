@@ -1,7 +1,7 @@
 # pylint: skip-file
 
 import kafka
-from kafka.admin import KafkaAdminClient, NewTopic
+from kafka.admin import KafkaAdminClient
 from kafka.protocol.admin import DescribeLogDirsRequest
 
 
