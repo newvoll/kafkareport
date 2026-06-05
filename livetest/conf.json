@@ -1,7 +1,0 @@
-{
-  "bootstrap.servers": "arn:aws:kafka:us-east-2:285043365592:cluster/kafkareport-livetest/4619d790-1957-4f23-a1ac-f68bfa50e4a5-5",
-  "security.protocol": "SASL_SSL",
-  "sasl.mechanism": "SCRAM-SHA-512",
-  "sasl.username": "kafkareport",
-  "sasl.password": "209jaefijq09ejfr913fdf19034fj"
-}
