@@ -109,14 +109,19 @@ localstack. This will manipulate pytest.topics on the kafka servers.
 # Addenda
 * Watermarks use a thread for each topic partition, but it can still take a while. `-v` for gory details along the way, `KafkaReport(debug=True)` for the lib.
 * This project started with
-  [confluent_kafka](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#). At
-  time of first writing, neither
-  [kafka-python](https://kafka-python.readthedocs.io/en/master/) nor
-  confluent_kafka implemented the `DescribeLogDirsRequest`, available
-  in java. A [recent
-  PR](https://github.com/dpkp/kafka-python/pull/2278) for kafka-python
-  supports it, so I used that experimental code. Not pretty, but it
-  works.
+  [confluent_kafka](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#),
+  but `DescribeLogDirsRequest` (available in Java) still isn't
+  implemented in
+  [confluent_kafka](https://github.com/confluentinc/confluent-kafka-python/issues/1179)
+  or the underlying
+  [librdkafka](https://github.com/confluentinc/librdkafka/issues/5333).
+  [kafka-python](https://kafka-python.readthedocs.io/en/master/) has
+  had a native `describe_log_dirs` since 2.1.0, but the stable 2.x
+  signature can't target a specific broker — that landed on
+  master/3.0.0.dev via [PR
+  #2881](https://github.com/dpkp/kafka-python/pull/2881). Until that
+  ships, `logdirs.py` monkey-patches a per-broker wrapper onto
+  `KafkaAdminClient.describe_log_dirs`.
   - As a result, there is a janky confluent_kafka to kafka-python
     AdminClient conf map in `logdirs.doit()`. It's only tested for
     sasl auth in MSK on AWS.
