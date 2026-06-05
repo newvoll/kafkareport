@@ -2,97 +2,23 @@
 
 import kafka
 from kafka.admin import KafkaAdminClient, NewTopic
-from kafka.protocol.api import Request, Response
-
-# isort: off
-from kafka.protocol.types import (
-    Array,
-    Boolean,
-    Bytes,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    Schema,
-    String,
-)
-
-# isort: on
+from kafka.protocol.admin import DescribeLogDirsRequest
 
 
-# Neither kafka-python nor confluent-kafka-python have implemented the DescribeLogDirsRequest
-# WIP PR on kafka-python: see https://github.com/dpkp/kafka-python/pull/2278
-# Backported stuff from the PR to support DescribeLogDirs with kafka-python
-class DescribeLogDirsResponse_v0(Response):
-    API_KEY = 35
-    API_VERSION = 0
-    FLEXIBLE_VERSION = True
-    SCHEMA = Schema(
-        ("throttle_time_ms", Int32),
-        (
-            "log_dirs",
-            Array(
-                ("error_code", Int16),
-                ("log_dir", String("utf-8")),
-                (
-                    "topics",
-                    Array(
-                        ("name", String("utf-8")),
-                        (
-                            "partitions",
-                            Array(
-                                ("partition_index", Int32),
-                                ("partition_size", Int64),
-                                ("offset_lag", Int64),
-                                ("is_future_key", Boolean),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    )
-
-
-class DescribeLogDirsRequest_v0(Request):
-    API_KEY = 35
-    API_VERSION = 0
-    RESPONSE_TYPE = DescribeLogDirsResponse_v0
-    SCHEMA = Schema(
-        ("topics", Array(("topic", String("utf-8")), ("partitions", Int32)))
-    )
-
-
-DescribeLogDirsResponse = [
-    DescribeLogDirsResponse_v0,
-]
-DescribeLogDirsRequest = [
-    DescribeLogDirsRequest_v0,
-]
-
-
-# Note we add a custom broker_id to avoid fetching from the current broker
+# kafka-python's native KafkaAdminClient.describe_log_dirs (since 2.1.0) takes no args
+# and can't be targeted at a specific broker; per-broker support only landed on master
+# (3.0.0.dev) via PR #2881. So we monkey-patch a per-broker variant that uses
+# _send_request_to_node, reusing kafka-python's upstream protocol schema.
 def describe_log_dirs(self, broker_id):
-    """Send a DescribeLogDirsRequest request to a broker.
-    :return: A message future
-    """
-    version = self._matching_api_version(DescribeLogDirsRequest)
-    if version <= 1:
-        request = DescribeLogDirsRequest[version]()
-        future = self._send_request_to_node(broker_id, request)
-        self._wait_for_futures([future])
-    else:
-        raise NotImplementedError(
-            "Support for DescribeLogDirsRequest_v{} has not yet been added to KafkaAdminClient.".format(
-                version
-            )
-        )
+    """Send a DescribeLogDirsRequest to a specific broker."""
+    version = self._client.api_version(DescribeLogDirsRequest, max_version=0)
+    request = DescribeLogDirsRequest[version]()
+    future = self._send_request_to_node(broker_id, request)
+    self._wait_for_futures([future])
     return future.value
 
 
-# monkey patch admin client
 kafka.KafkaAdminClient.describe_log_dirs = describe_log_dirs
-##############################################################################
 
 
 # Our little helpers to gather the size of all partitions across all brokers
