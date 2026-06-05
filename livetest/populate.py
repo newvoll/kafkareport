@@ -38,15 +38,19 @@ def make_admin(conf):
 
 
 def create_topics(admin):
+    # replication_factor=-1 → broker default. MSK Serverless manages
+    # replication and only allows the seven configs listed at
+    # https://docs.aws.amazon.com/msk/latest/developerguide/msk-serverless-cluster-resources.html
+    # so delete.retention.ms can't be set on serverless. Drop it; the
+    # broker default still shows up in the report.
     new_topics = [
         NewTopic(
             name,
             num_partitions=partitions,
-            replication_factor=2,
+            replication_factor=-1,
             config={
                 "retention.ms": str(retention_ms),
                 "retention.bytes": str(retention_bytes),
-                "delete.retention.ms": str(min(retention_ms, 86_400_000)),
             },
         )
         for name, partitions, _, _, retention_ms, retention_bytes in TOPICS

@@ -92,9 +92,9 @@ Make a `conf.json` — note the `AWS_MSK_IAM` sentinel; no user/pass:
 
 Credentials come from the default AWS chain. On the bastion that's the
 instance profile (which the IAM stack grants `kafka-cluster:*` on the
-cluster's topics and groups). Region comes from boto3's resolver —
-`AWS_REGION` env or `~/.aws/config`; on EC2 it can also resolve from
-IMDS, but exporting `AWS_REGION` explicitly is more predictable.
+cluster's topics and groups). Region is exported into the bastion's
+shell at launch by user-data, so `AWS_REGION` is already set when you
+SSM in.
 
 ## Run from the bastion
 
@@ -113,7 +113,6 @@ git clone https://github.com/newvoll/kafkareport
 cd kafkareport
 pip3.14 install --user .
 # copy conf.json onto the box however you like (paste into nano, scp via SSM, etc.)
-# for IAM only: export AWS_REGION=<your region>
 python3.14 livetest/populate.py conf.json
 kafkareport conf.json
 ```

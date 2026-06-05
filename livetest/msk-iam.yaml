@@ -196,6 +196,10 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           dnf install -y python3.14 python3.14-pip git
+          cat >/etc/profile.d/aws-region.sh <<EOF
+          export AWS_REGION=${AWS::Region}
+          export AWS_DEFAULT_REGION=${AWS::Region}
+          EOF
 
 Outputs:
   ClusterArn:
