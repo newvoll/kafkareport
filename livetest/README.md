@@ -7,6 +7,9 @@ currently supports.
 **Costs roughly $280+/month at the default size (`kafka.m7g.large` × 2
 brokers + storage). Tear it down when you're done.**
 
+> [!WARNING]
+> LLM-created for throwaway smoke test. Use only on nonproduction accounts.
+
 ## Deploy
 
 ```sh
@@ -61,12 +64,12 @@ aws ssm start-session --target <BastionInstanceId>
 On the bastion:
 
 ```sh
-sudo dnf install -y git
+sudo dnf install -y git python3.14 python3.14-pip
 git clone https://github.com/newvoll/kafkareport
 cd kafkareport
 pip install --user .
 # copy conf.json onto the box however you like (paste into nano, scp via SSM, etc.)
-python livetest/populate.py conf.json
+python3.14 livetest/populate.py conf.json
 kafkareport conf.json
 ```
 
