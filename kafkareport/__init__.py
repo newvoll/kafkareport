@@ -251,11 +251,6 @@ class KafkaReport:
     def topic_sizes(self) -> list[dict[str, Union[str, int]]]:
         """Retrieves the size each topic takes up on the servers.
 
-        At time of first writing, neither kafka-python nor
-        confluent_kafka implemented the DescribeLogDirsRequest,
-        available in java. A recent PR for kafka-python supports it,
-        so I used that experimental code. Not pretty, but it works.
-
         :param timeout: Seconds to wait for timeout.
         :return: A dict of the topic's names and sizes in bytes,
         """
