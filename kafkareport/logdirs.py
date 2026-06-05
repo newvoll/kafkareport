@@ -1,5 +1,3 @@
-# pylint: skip-file
-
 import kafka
 from kafka.admin import KafkaAdminClient
 from kafka.protocol.admin import DescribeLogDirsRequest
@@ -49,7 +47,7 @@ def gen_size_metrics(logDirSizes):
     Eeach tag is a string of the form "key:value"
     """
     metrics = []
-    for brokerId in logDirSizes.keys():
+    for brokerId in logDirSizes:
         for topic in logDirSizes[brokerId]:
             size = sum(logDirSizes[brokerId][topic].values())
             tags = [f"broker_id:{brokerId}", f"topic:{topic}"]

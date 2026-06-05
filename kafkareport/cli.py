@@ -64,9 +64,7 @@ parser.add_argument(
     default=False,
     help="show retention configs for topics.",
 )
-parser.add_argument(
-    "--csv", action="store", default=None, help="filename for csv output of table"
-)
+parser.add_argument("--csv", action="store", default=None, help="filename for csv output of table")
 parser.add_argument("-v", "--verbose", action="store_true", default=False, help="DEBUG")
 parser.add_argument(
     "--version",
@@ -110,7 +108,7 @@ def _write_csv(outs):
         writer = csv.writer(f)
         writer.writerow(outs[0].keys())
         for out in outs:
-            writer.writerow([out[x] for x in outs[0].keys()])
+            writer.writerow([out[x] for x in outs[0]])
 
 
 def _get_conf():

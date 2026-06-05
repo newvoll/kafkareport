@@ -52,13 +52,11 @@ class KafkaReport:
 
     report.watermarks("kafkareportuno")
 
-    """  # pylint: disable=line-too-long
+    """  # noqa: E501
 
     _TIMEOUT = 30
 
-    def __init__(
-        self, conf: dict[str, str | bool | Callable], debug: bool = False
-    ):
+    def __init__(self, conf: dict[str, str | bool | Callable], debug: bool = False):
         self.debug = debug
         if self.debug:
             logger.setLevel(logging.DEBUG)
@@ -133,9 +131,7 @@ class KafkaReport:
         conf["error_cb"] = self._error_cb
         conf["group.id"] = f"{self.name}-{time.time()}-watermark-thread"
         consumer = Consumer(conf, logger=logger)
-        (lo, hi) = consumer.get_watermark_offsets(
-            partition, timeout=timeout, cached=False
-        )
+        (lo, hi) = consumer.get_watermark_offsets(partition, timeout=timeout, cached=False)
         message = self._get_offset_message(consumer, partition, lo, timeout=timeout)
         minnie = message.timestamp()[1]
         earliest = message
@@ -158,7 +154,7 @@ class KafkaReport:
         if metadata.topics[topic].error is not None:
             raise KafkaException(metadata.topics[topic].error)
         res = self.admin.describe_configs([ConfigResource(RESOURCE_TOPIC, topic)])
-        for _, f in res.items():
+        for f in res.values():
             retentions = [str(v) for k, v in f.result().items() if "retention" in k]
         result = {}
         for ret in retentions:
@@ -168,9 +164,7 @@ class KafkaReport:
         consumer.close()
         return result
 
-    def _watermark_results(
-        self, results: list[tuple[Message, Message]], topic: str
-    ) -> tuple:
+    def _watermark_results(self, results: list[tuple[Message, Message]], topic: str) -> tuple:
         """Processes partition thread results for earliest and latest.
 
         Also prints out message contents with logLevel == DEBUG.
@@ -217,9 +211,7 @@ class KafkaReport:
         metadata = consumer.list_topics(topic, timeout=timeout)
         if metadata.topics[topic].error is not None:
             raise KafkaException(metadata.topics[topic].error)
-        partitions = [
-            TopicPartition(topic, p) for p in metadata.topics[topic].partitions
-        ]
+        partitions = [TopicPartition(topic, p) for p in metadata.topics[topic].partitions]
         committed = consumer.committed(partitions, timeout=timeout)
         threads = []
         results = [(None, None)] * len(committed)
