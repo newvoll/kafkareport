@@ -9,13 +9,14 @@ import logging
 import pprint
 import sys
 from importlib.metadata import metadata, version
+from pathlib import Path
 from textwrap import wrap
 
 import confluent_kafka
 import kafka
 from prettytable import PrettyTable
 
-from kafkareport import KafkaReport, helpers
+from kafkareport import KafkaReport
 
 logger = logging.getLogger(__name__)
 pp = pprint.PrettyPrinter(indent=4)
@@ -113,8 +114,10 @@ def _write_csv(outs):
 
 
 def _get_conf():
-    conf_json = helpers.slurp(args.conf_file)
-    return json.loads(conf_json)
+    try:
+        return json.loads(Path(args.conf_file).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        sys.exit(f"{args.conf_file} not found.")
 
 
 def _doit():

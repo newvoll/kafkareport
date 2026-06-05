@@ -10,16 +10,8 @@ import pytest
 from confluent_kafka import KafkaException
 from confluent_kafka.admin import AdminClient
 
-from kafkareport import helpers
-
 logger = logging.getLogger(__name__)
 logging.getLogger("kafka").setLevel(logging.WARNING)
-
-
-def slurp_helper(filename):
-    """Slurps up content of helper file with filename."""
-    jconf = helpers.slurp(filename)
-    return json.loads(jconf)
 
 
 def pytest_addoption(parser):
@@ -34,7 +26,7 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     """Effectively global vars, including some functions."""
-    pytest.conf = slurp_helper(config.getoption("conf"))
+    pytest.conf = json.loads(Path(config.getoption("conf")).read_text(encoding="utf-8"))
     pytest.topics = ["kafkareportuno", "kafkareportdue"]
 
 

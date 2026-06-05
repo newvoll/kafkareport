@@ -1,14 +1,11 @@
 """Reports on topic sizes, watermarks, and retention policies."""
 
-import json
 import logging
-import os
 import sys
 import threading
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime, timezone
-from typing import Union
+from datetime import UTC, datetime
 
 from confluent_kafka import (
     Consumer,
@@ -19,7 +16,7 @@ from confluent_kafka import (
 )
 from confluent_kafka.admin import RESOURCE_TOPIC, AdminClient, ConfigResource
 
-from kafkareport import helpers, logdirs
+from kafkareport import logdirs
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
