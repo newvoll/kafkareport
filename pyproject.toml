@@ -26,7 +26,7 @@ ruff = "^0.15.16"
 mypy = "^2.1.0"
 
 [[tool.mypy.overrides]]
-module = ["kafka.*", "confluent_kafka.*"]
+module = ["kafka.*"]
 ignore_missing_imports = true
 
 [tool.ruff]

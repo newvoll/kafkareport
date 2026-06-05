@@ -149,7 +149,7 @@ def main():
     except KeyboardInterrupt:
         logger.fatal("Interrupted")
         sys.exit(1)
-    except (confluent_kafka.KafkaError, confluent_kafka.KafkaException) as e:
+    except confluent_kafka.KafkaException as e:
         logger.fatal("confluent_kafka error: %s", e)
         sys.exit(1)
     except kafka.errors.KafkaError as e:

@@ -4,8 +4,8 @@ import logging
 import sys
 import threading
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from confluent_kafka import (
     Consumer,
@@ -56,7 +56,7 @@ class KafkaReport:
 
     _TIMEOUT = 30
 
-    def __init__(self, conf: dict[str, str | bool | Callable], debug: bool = False):
+    def __init__(self, conf: dict[str, Any], debug: bool = False):
         self.debug = debug
         if self.debug:
             logger.setLevel(logging.DEBUG)
@@ -78,7 +78,7 @@ class KafkaReport:
         during local testing but then magically started working again.
         """
         logger.fatal(error)
-        raise error
+        raise KafkaException(error)
 
     def _get_offset_message(
         self,
@@ -105,12 +105,13 @@ class KafkaReport:
             logger.critical("Timed out.")
             raise e
         logger.debug("message %s got.", message)
-        if message.error():
-            if message.error().code() == -191:
+        err = message.error()
+        if err:
+            if err.code() == -191:
                 logger.debug("_PARTITION_EOF. Nothing to see here")
             else:
-                logger.fatal("Message consume error: %s", message.error())
-                raise message.error()
+                logger.fatal("Message consume error: %s", err)
+                raise KafkaException(err)
         return message
 
     def _get_lo_hi(
@@ -184,7 +185,7 @@ class KafkaReport:
             earliest_message = min(earliests, key=lambda x: x.timestamp()[1])
             earliest = earliest_message.timestamp()[1]
             early = datetime.fromtimestamp(earliest / 1000).astimezone(UTC)
-            earliest_val = earliest_message.value().decode("utf-8")
+            earliest_val = (earliest_message.value() or b"").decode("utf-8")
             logger.debug("Earliest message %s: %s", early, earliest_val)
         except ValueError:
             logger.debug("No earliest watermarks for %s.", topic)
@@ -192,7 +193,7 @@ class KafkaReport:
             latest_message = max(latests, key=lambda x: x.timestamp()[1])
             latest = latest_message.timestamp()[1]
             late = datetime.fromtimestamp(latest / 1000).astimezone(UTC)
-            latest_val = latest_message.value().decode("utf-8")
+            latest_val = (latest_message.value() or b"").decode("utf-8")
             logger.debug("Latest message %s: %s", late, latest_val)
         except ValueError:
             logger.debug("No latest watermark for %s.", topic)
@@ -216,7 +217,7 @@ class KafkaReport:
         partitions = [TopicPartition(topic, p) for p in metadata.topics[topic].partitions]
         committed = consumer.committed(partitions, timeout=timeout)
         threads = []
-        results = [(None, None)] * len(committed)
+        results: list[tuple[Message, Message]] = [(None, None)] * len(committed)  # type: ignore[list-item]
         logger.debug("%s threads launching for %s", len(committed), topic)
         for i, partition in enumerate(committed):
             logger.debug(partition)
@@ -238,7 +239,7 @@ class KafkaReport:
 
         :return: A list of all topic names
         """
-        return self.admin.list_topics(timeout=timeout).topics.keys()
+        return list(self.admin.list_topics(timeout=timeout).topics.keys())
 
     def topic_sizes(self) -> list[dict[str, str | int]]:
         """Retrieves the size each topic takes up on the servers.
