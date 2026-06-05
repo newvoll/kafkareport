@@ -46,3 +46,12 @@ jobs:
 
       - name: pytest
         run: poetry install && poetry run pytest
+
+      - name: Ruff check
+        run: poetry run ruff check
+
+      - name: Ruff format
+        run: poetry run ruff format --check
+
+      - name: mypy
+        run: poetry run mypy ssmbak
