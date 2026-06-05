@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Union
 
 from confluent_kafka import (
@@ -188,7 +188,7 @@ class KafkaReport:
         try:
             earliest_message = min(earliests, key=lambda x: x.timestamp()[1])
             earliest = earliest_message.timestamp()[1]
-            early = datetime.fromtimestamp(earliest / 1000).astimezone(timezone.utc)
+            early = datetime.fromtimestamp(earliest / 1000).astimezone(UTC)
             earliest_val = earliest_message.value().decode("utf-8")
             logger.debug("Earliest message %s: %s", early, earliest_val)
         except ValueError:
@@ -197,7 +197,7 @@ class KafkaReport:
         try:
             latest_message = max(latests, key=lambda x: x.timestamp()[1])
             latest = latest_message.timestamp()[1]
-            late = datetime.fromtimestamp(latest / 1000).astimezone(timezone.utc)
+            late = datetime.fromtimestamp(latest / 1000).astimezone(UTC)
             latest_val = latest_message.value().decode("utf-8")
             logger.debug("Latest message %s: %s", late, latest_val)
         except ValueError:
