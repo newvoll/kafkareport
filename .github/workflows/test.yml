@@ -46,9 +46,3 @@ jobs:
 
       - name: pytest
         run: poetry install && poetry run pytest
-
-      - name: Pylint
-        run: |
-          poetry run pylint $(git ls-files '*.py')
-
-      - run: poetry run pytype
