@@ -21,7 +21,9 @@ IAM_MECHANISM = "AWS_MSK_IAM"
 
 
 def is_iam(conf: dict[str, Any]) -> bool:
-    return conf.get("sasl.mechanism") == IAM_MECHANISM
+    # `oauth_cb` is the post-injection marker — inject_confluent_iam overwrites
+    # the sentinel `sasl.mechanism` with `OAUTHBEARER`, but only IAM sets oauth_cb.
+    return conf.get("sasl.mechanism") == IAM_MECHANISM or "oauth_cb" in conf
 
 
 def _resolve_region() -> str:
