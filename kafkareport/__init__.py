@@ -1,13 +1,11 @@
 """Reports on topic sizes, watermarks, and retention policies."""
 
-import json
 import logging
-import os
 import sys
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Callable, Union
+from datetime import UTC, datetime
+from typing import Any
 
 from confluent_kafka import (
     Consumer,
@@ -18,7 +16,7 @@ from confluent_kafka import (
 )
 from confluent_kafka.admin import RESOURCE_TOPIC, AdminClient, ConfigResource
 
-from kafkareport import helpers, logdirs
+from kafkareport import logdirs
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -54,13 +52,11 @@ class KafkaReport:
 
     report.watermarks("kafkareportuno")
 
-    """  # pylint: disable=line-too-long
+    """  # noqa: E501
 
     _TIMEOUT = 30
 
-    def __init__(
-        self, conf: dict[str, Union[str, bool, Callable]], debug: bool = False
-    ):
+    def __init__(self, conf: dict[str, Any], debug: bool = False):
         self.debug = debug
         if self.debug:
             logger.setLevel(logging.DEBUG)
@@ -82,7 +78,7 @@ class KafkaReport:
         during local testing but then magically started working again.
         """
         logger.fatal(error)
-        raise error
+        raise KafkaException(error)
 
     def _get_offset_message(
         self,
@@ -109,12 +105,13 @@ class KafkaReport:
             logger.critical("Timed out.")
             raise e
         logger.debug("message %s got.", message)
-        if message.error():
-            if message.error().code() == -191:
+        err = message.error()
+        if err:
+            if err.code() == -191:
                 logger.debug("_PARTITION_EOF. Nothing to see here")
             else:
-                logger.fatal("Message consume error: %s", message.error())
-                raise message.error()
+                logger.fatal("Message consume error: %s", err)
+                raise KafkaException(err)
         return message
 
     def _get_lo_hi(
@@ -135,9 +132,7 @@ class KafkaReport:
         conf["error_cb"] = self._error_cb
         conf["group.id"] = f"{self.name}-{time.time()}-watermark-thread"
         consumer = Consumer(conf, logger=logger)
-        (lo, hi) = consumer.get_watermark_offsets(
-            partition, timeout=timeout, cached=False
-        )
+        (lo, hi) = consumer.get_watermark_offsets(partition, timeout=timeout, cached=False)
         message = self._get_offset_message(consumer, partition, lo, timeout=timeout)
         minnie = message.timestamp()[1]
         earliest = message
@@ -160,7 +155,7 @@ class KafkaReport:
         if metadata.topics[topic].error is not None:
             raise KafkaException(metadata.topics[topic].error)
         res = self.admin.describe_configs([ConfigResource(RESOURCE_TOPIC, topic)])
-        for _, f in res.items():
+        for f in res.values():
             retentions = [str(v) for k, v in f.result().items() if "retention" in k]
         result = {}
         for ret in retentions:
@@ -172,7 +167,7 @@ class KafkaReport:
 
     def _watermark_results(
         self, results: list[tuple[Message, Message]], topic: str
-    ) -> tuple:
+    ) -> tuple[datetime | str, datetime | str]:
         """Processes partition thread results for earliest and latest.
 
         Also prints out message contents with logLevel == DEBUG.
@@ -184,27 +179,27 @@ class KafkaReport:
         latests = [x[1] for x in results if not x[1].error()]
         earliests.sort(key=lambda x: x.timestamp()[1])
         latests.sort(key=lambda x: x.timestamp()[1], reverse=True)
+        early: datetime | str = ""
+        late: datetime | str = ""
         try:
             earliest_message = min(earliests, key=lambda x: x.timestamp()[1])
             earliest = earliest_message.timestamp()[1]
-            early = datetime.fromtimestamp(earliest / 1000).astimezone(timezone.utc)
-            earliest_val = earliest_message.value().decode("utf-8")
+            early = datetime.fromtimestamp(earliest / 1000).astimezone(UTC)
+            earliest_val = (earliest_message.value() or b"").decode("utf-8")
             logger.debug("Earliest message %s: %s", early, earliest_val)
         except ValueError:
             logger.debug("No earliest watermarks for %s.", topic)
-            early = ""
         try:
             latest_message = max(latests, key=lambda x: x.timestamp()[1])
             latest = latest_message.timestamp()[1]
-            late = datetime.fromtimestamp(latest / 1000).astimezone(timezone.utc)
-            latest_val = latest_message.value().decode("utf-8")
+            late = datetime.fromtimestamp(latest / 1000).astimezone(UTC)
+            latest_val = (latest_message.value() or b"").decode("utf-8")
             logger.debug("Latest message %s: %s", late, latest_val)
         except ValueError:
             logger.debug("No latest watermark for %s.", topic)
-            late = ""
         return (early, late)
 
-    def watermarks(self, topic: str, timeout: int = _TIMEOUT) -> dict[str, datetime]:
+    def watermarks(self, topic: str, timeout: int = _TIMEOUT) -> dict[str, datetime | str]:
         """Retrieves the earliest and latest message times for each topic.
 
         Spans all partitions. Launches a thread for each
@@ -219,12 +214,10 @@ class KafkaReport:
         metadata = consumer.list_topics(topic, timeout=timeout)
         if metadata.topics[topic].error is not None:
             raise KafkaException(metadata.topics[topic].error)
-        partitions = [
-            TopicPartition(topic, p) for p in metadata.topics[topic].partitions
-        ]
+        partitions = [TopicPartition(topic, p) for p in metadata.topics[topic].partitions]
         committed = consumer.committed(partitions, timeout=timeout)
         threads = []
-        results = [(None, None)] * len(committed)
+        results: list[tuple[Message, Message]] = [(None, None)] * len(committed)  # type: ignore[list-item]
         logger.debug("%s threads launching for %s", len(committed), topic)
         for i, partition in enumerate(committed):
             logger.debug(partition)
@@ -246,16 +239,16 @@ class KafkaReport:
 
         :return: A list of all topic names
         """
-        return self.admin.list_topics(timeout=timeout).topics.keys()
+        return list(self.admin.list_topics(timeout=timeout).topics.keys())
 
-    def topic_sizes(self) -> list[dict[str, Union[str, int]]]:
+    def topic_sizes(self) -> list[dict[str, str | int]]:
         """Retrieves the size each topic takes up on the servers.
 
         :param timeout: Seconds to wait for timeout.
         :return: A dict of the topic's names and sizes in bytes,
         """
         sizes = logdirs.doit(self.conf)
-        size_by_name = {}
+        size_by_name: dict[str, int] = {}
         for topics in sizes.values():
             for topic, partitions in topics.items():
                 for partition, size in partitions.items():
@@ -265,10 +258,10 @@ class KafkaReport:
                     except KeyError:
                         size_by_name[topic] = round(size)
         sorted_by_size = sorted(size_by_name.items(), key=lambda x: x[1], reverse=True)
-        result = []
+        result: list[dict[str, str | int]] = []
         for topic in sorted_by_size:
             size = round(int(topic[1]))
-            res = {
+            res: dict[str, str | int] = {
                 "topic": topic[0],
                 "bytes": size,
             }

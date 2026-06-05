@@ -11,7 +11,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 prettytable = "^3.10.0"
-confluent_kafka = "^2.4.0"
+confluent_kafka = "^2.14.0"
 kafka-python = "^2.3.2"
 
 [tool.poetry.scripts]
@@ -19,25 +19,31 @@ kafkareport = "kafkareport.cli:main"
 
 [tool.poetry.group.develop.dependencies]
 pytest = "^8.2.2"
-black = "^24.4.2"
 pre-commit = "^3.7.1"
-isort = "^5.13.2"
-pylint = "^3.2.3"
-pytype = "^2024.4.11"
 sphinx = "^7.3.7"
 sphinx-rtd-theme = "^2.0.0"
 ruff = "^0.15.16"
 mypy = "^2.1.0"
 
-[tool.isort]
-profile = "black"
+[[tool.mypy.overrides]]
+module = ["kafka.*"]
+ignore_missing_imports = true
 
-[tool.pylint]
-ignored-classes = ["pytest"]
-ignore-paths = '^docs/'
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["tests", "docs", "livetest"]
 
-[tool.pytype]
-inputs = ['kafkareport']
+[tool.ruff.lint]
+select = [
+    "E", "F", "I", "UP", "B", "SIM", "RUF", "C90",  # core
+    "ARG", "A", "C4", "PIE", "RET", "PERF",           # code quality
+    "S", "DTZ",                                         # security/correctness
+    "LOG", "G",                                         # logging
+    "FURB",                                              # modernization
+    "TCH",                                               # type-checking imports
+    "ERA",                                               # commented-out code
+]
 
 [build-system]
 requires = ["poetry-core"]

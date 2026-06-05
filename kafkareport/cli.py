@@ -9,13 +9,14 @@ import logging
 import pprint
 import sys
 from importlib.metadata import metadata, version
+from pathlib import Path
 from textwrap import wrap
 
 import confluent_kafka
 import kafka
 from prettytable import PrettyTable
 
-from kafkareport import KafkaReport, helpers
+from kafkareport import KafkaReport
 
 logger = logging.getLogger(__name__)
 pp = pprint.PrettyPrinter(indent=4)
@@ -63,9 +64,7 @@ parser.add_argument(
     default=False,
     help="show retention configs for topics.",
 )
-parser.add_argument(
-    "--csv", action="store", default=None, help="filename for csv output of table"
-)
+parser.add_argument("--csv", action="store", default=None, help="filename for csv output of table")
 parser.add_argument("-v", "--verbose", action="store_true", default=False, help="DEBUG")
 parser.add_argument(
     "--version",
@@ -109,12 +108,14 @@ def _write_csv(outs):
         writer = csv.writer(f)
         writer.writerow(outs[0].keys())
         for out in outs:
-            writer.writerow([out[x] for x in outs[0].keys()])
+            writer.writerow([out[x] for x in outs[0]])
 
 
 def _get_conf():
-    conf_json = helpers.slurp(args.conf_file)
-    return json.loads(conf_json)
+    try:
+        return json.loads(Path(args.conf_file).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        sys.exit(f"{args.conf_file} not found.")
 
 
 def _doit():
@@ -148,7 +149,7 @@ def main():
     except KeyboardInterrupt:
         logger.fatal("Interrupted")
         sys.exit(1)
-    except (confluent_kafka.KafkaError, confluent_kafka.KafkaException) as e:
+    except confluent_kafka.KafkaException as e:
         logger.fatal("confluent_kafka error: %s", e)
         sys.exit(1)
     except kafka.errors.KafkaError as e:

@@ -1,0 +1,269 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Provisioned MSK cluster with SASL/SCRAM auth for kafkareport live testing.
+  Creates: VPC, IGW, 1 public subnet (bastion), 2 private subnets (brokers),
+  customer KMS key, SCRAM secret, MSK cluster, bastion EC2 with SSM access.
+
+  Heads up: MSK provisioned costs roughly $280+/month at this size
+  (kafka.m7g.large × 2 brokers + storage). Tear down promptly:
+  `aws cloudformation delete-stack --stack-name <name>`.
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: kafkareport-livetest
+    Description: Used as a name prefix on most resources.
+
+  KafkaUsername:
+    Type: String
+    Default: kafkareport
+    MinLength: 1
+
+  KafkaPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 12
+    Description: SCRAM password (12+ chars). You will need this for the conf file.
+
+  KafkaVersion:
+    Type: String
+    Default: 3.7.x.kraft
+    Description: |
+      MSK Kafka version. If deploy fails on this, run
+      `aws kafka list-kafka-versions` and pick a supported one.
+
+  BrokerInstanceType:
+    Type: String
+    Default: kafka.m7g.large
+    Description: |
+      MSK broker instance type. Smallest standard options are
+      kafka.m7g.large (Graviton) and kafka.m5.large (Intel). MSK no
+      longer supports t-family. kafka.express.* is cheaper for spiky
+      workloads but bills differently (per-partition + traffic).
+
+  BastionAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Latest Amazon Linux 2023 AMI via SSM Parameter Store.
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-vpc
+
+  Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-igw
+
+  IgwAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref Igw
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-public
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-private-a
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.2.0/24
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-private-b
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Igw
+
+  PublicSubnetRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  BrokerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ClusterName} MSK brokers
+      VpcId: !Ref Vpc
+
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub ${ClusterName} bastion
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  # Bastion can reach Kafka ports on brokers
+  BrokerIngressFromBastion:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BrokerSecurityGroup
+      IpProtocol: tcp
+      FromPort: 9092
+      ToPort: 9098
+      SourceSecurityGroupId: !Ref BastionSecurityGroup
+
+  # Brokers talk to each other within the SG
+  BrokerIngressSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BrokerSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref BrokerSecurityGroup
+
+  # Customer KMS key — MSK requires a CMK for SCRAM secrets (not aws/secretsmanager).
+  KmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub ${ClusterName} SCRAM secret encryption
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnableIAMRoot
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+
+  # MSK requires SCRAM secret names to start with "AmazonMSK_".
+  ScramSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub AmazonMSK_${ClusterName}
+      KmsKeyId: !Ref KmsKey
+      SecretString: !Sub '{"username":"${KafkaUsername}","password":"${KafkaPassword}"}'
+
+  Cluster:
+    Type: AWS::MSK::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+      KafkaVersion: !Ref KafkaVersion
+      NumberOfBrokerNodes: 2
+      BrokerNodeGroupInfo:
+        InstanceType: !Ref BrokerInstanceType
+        ClientSubnets:
+          - !Ref PrivateSubnetA
+          - !Ref PrivateSubnetB
+        SecurityGroups:
+          - !Ref BrokerSecurityGroup
+        StorageInfo:
+          EBSStorageInfo:
+            VolumeSize: 100
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: TLS
+          InCluster: true
+      ClientAuthentication:
+        Sasl:
+          Scram:
+            Enabled: true
+
+  ScramAssociation:
+    Type: AWS::MSK::BatchScramSecret
+    Properties:
+      ClusterArn: !Ref Cluster
+      SecretArnList:
+        - !Ref ScramSecret
+
+  # Bastion: tiny EC2 with SSM agent (no SSH needed).
+  BastionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  BastionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BastionRole
+
+  Bastion:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      ImageId: !Ref BastionAmiId
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref BastionSecurityGroup
+      IamInstanceProfile: !Ref BastionInstanceProfile
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-bastion
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          dnf install -y python3-pip git
+          su - ec2-user -c 'pip3 install --user confluent-kafka'
+
+Outputs:
+  ClusterArn:
+    Value: !Ref Cluster
+    Description: |
+      Get bootstrap brokers with:
+      aws kafka get-bootstrap-brokers --cluster-arn <this>
+
+  SecretArn:
+    Value: !Ref ScramSecret
+
+  BastionInstanceId:
+    Value: !Ref Bastion
+    Description: |
+      SSM into it with:
+      aws ssm start-session --target <this>
+
+  VpcId:
+    Value: !Ref Vpc
+
+  BrokerSecurityGroupId:
+    Value: !Ref BrokerSecurityGroup
