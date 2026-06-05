@@ -164,7 +164,9 @@ class KafkaReport:
         consumer.close()
         return result
 
-    def _watermark_results(self, results: list[tuple[Message, Message]], topic: str) -> tuple:
+    def _watermark_results(
+        self, results: list[tuple[Message, Message]], topic: str
+    ) -> tuple[datetime | str, datetime | str]:
         """Processes partition thread results for earliest and latest.
 
         Also prints out message contents with logLevel == DEBUG.
@@ -176,6 +178,8 @@ class KafkaReport:
         latests = [x[1] for x in results if not x[1].error()]
         earliests.sort(key=lambda x: x.timestamp()[1])
         latests.sort(key=lambda x: x.timestamp()[1], reverse=True)
+        early: datetime | str = ""
+        late: datetime | str = ""
         try:
             earliest_message = min(earliests, key=lambda x: x.timestamp()[1])
             earliest = earliest_message.timestamp()[1]
@@ -184,7 +188,6 @@ class KafkaReport:
             logger.debug("Earliest message %s: %s", early, earliest_val)
         except ValueError:
             logger.debug("No earliest watermarks for %s.", topic)
-            early = ""
         try:
             latest_message = max(latests, key=lambda x: x.timestamp()[1])
             latest = latest_message.timestamp()[1]
@@ -193,10 +196,9 @@ class KafkaReport:
             logger.debug("Latest message %s: %s", late, latest_val)
         except ValueError:
             logger.debug("No latest watermark for %s.", topic)
-            late = ""
         return (early, late)
 
-    def watermarks(self, topic: str, timeout: int = _TIMEOUT) -> dict[str, datetime]:
+    def watermarks(self, topic: str, timeout: int = _TIMEOUT) -> dict[str, datetime | str]:
         """Retrieves the earliest and latest message times for each topic.
 
         Spans all partitions. Launches a thread for each
@@ -245,7 +247,7 @@ class KafkaReport:
         :return: A dict of the topic's names and sizes in bytes,
         """
         sizes = logdirs.doit(self.conf)
-        size_by_name = {}
+        size_by_name: dict[str, int] = {}
         for topics in sizes.values():
             for topic, partitions in topics.items():
                 for partition, size in partitions.items():
@@ -255,10 +257,10 @@ class KafkaReport:
                     except KeyError:
                         size_by_name[topic] = round(size)
         sorted_by_size = sorted(size_by_name.items(), key=lambda x: x[1], reverse=True)
-        result = []
+        result: list[dict[str, str | int]] = []
         for topic in sorted_by_size:
             size = round(int(topic[1]))
-            res = {
+            res: dict[str, str | int] = {
                 "topic": topic[0],
                 "bytes": size,
             }

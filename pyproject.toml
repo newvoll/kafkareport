@@ -25,6 +25,10 @@ sphinx-rtd-theme = "^2.0.0"
 ruff = "^0.15.16"
 mypy = "^2.1.0"
 
+[[tool.mypy.overrides]]
+module = ["kafka.*", "confluent_kafka.*"]
+ignore_missing_imports = true
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100
