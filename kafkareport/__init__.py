@@ -217,7 +217,7 @@ class KafkaReport:
         results: list[tuple[Message, Message]] = []
         with ThreadPoolExecutor() as pool:
             futures = [pool.submit(self._get_lo_hi, p, timeout=timeout) for p in committed]
-            results.extend(completed.result() for completed in as_completed(futures))
+            results.extend(f.result() for f in as_completed(futures))
         (early, late) = self._watermark_results(results, topic)
         consumer.close()
         return {"earliest": early, "latest": late}
