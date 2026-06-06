@@ -60,7 +60,8 @@ class KafkaReport:
         self.debug = debug
         if self.debug:
             logger.setLevel(logging.DEBUG)
-        auth.inject_confluent_iam(conf, debug=self.debug)
+        if auth.is_iam(conf):
+            auth.inject_confluent_iam(conf, debug=self.debug)
         self.conf = conf
         self.name = "kafkareport"
         self.admin = AdminClient(self.conf)
