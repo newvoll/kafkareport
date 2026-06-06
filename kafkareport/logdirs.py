@@ -2,6 +2,8 @@ import kafka
 from kafka.admin import KafkaAdminClient
 from kafka.protocol.admin import DescribeLogDirsRequest
 
+from kafkareport.auth import kafka_python_conf
+
 
 # kafka-python's native KafkaAdminClient.describe_log_dirs (since 2.1.0) takes no args
 # and can't be targeted at a specific broker; per-broker support only landed on master
@@ -55,15 +57,7 @@ def gen_size_metrics(logDirSizes):
     return metrics
 
 
-def doit(conf):
+def doit(conf, debug=False):
     """Gets all LogDir sizes for all topics."""
-    kp_conf = {"bootstrap_servers": conf["bootstrap.servers"]}
-    try:
-        kp_conf["sasl_plain_username"] = conf["sasl.username"]
-        kp_conf["sasl_plain_password"] = conf["sasl.password"]
-        kp_conf["sasl_mechanism"] = conf["sasl.mechanism"]
-        kp_conf["security_protocol"] = "SASL_SSL"
-    except KeyError:
-        pass
-    admin = KafkaAdminClient(**kp_conf)
+    admin = KafkaAdminClient(**kafka_python_conf(conf, debug=debug))
     return get_log_dir_size(admin)

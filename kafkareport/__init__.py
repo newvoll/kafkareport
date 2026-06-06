@@ -16,7 +16,7 @@ from confluent_kafka import (
 )
 from confluent_kafka.admin import RESOURCE_TOPIC, AdminClient, ConfigResource
 
-from kafkareport import logdirs
+from kafkareport import auth, logdirs
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -60,6 +60,8 @@ class KafkaReport:
         self.debug = debug
         if self.debug:
             logger.setLevel(logging.DEBUG)
+        if auth.is_iam(conf):
+            auth.inject_confluent_iam(conf, debug=self.debug)
         self.conf = conf
         self.name = "kafkareport"
         self.admin = AdminClient(self.conf)
@@ -247,7 +249,7 @@ class KafkaReport:
         :param timeout: Seconds to wait for timeout.
         :return: A dict of the topic's names and sizes in bytes,
         """
-        sizes = logdirs.doit(self.conf)
+        sizes = logdirs.doit(self.conf, debug=self.debug)
         size_by_name: dict[str, int] = {}
         for topics in sizes.values():
             for topic, partitions in topics.items():

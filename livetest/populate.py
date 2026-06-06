@@ -16,6 +16,8 @@ from pathlib import Path
 from confluent_kafka import Producer
 from confluent_kafka.admin import AdminClient, NewTopic
 
+from kafkareport.auth import inject_confluent_iam
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
@@ -89,6 +91,7 @@ def main():
     args = parser.parse_args()
 
     conf = json.loads(Path(args.conf_file).read_text(encoding="utf-8"))
+    inject_confluent_iam(conf)
 
     admin = make_admin(conf)
     create_topics(admin)

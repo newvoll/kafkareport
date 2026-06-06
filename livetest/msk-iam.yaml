@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: |
-  Provisioned MSK cluster with SASL/SCRAM auth for kafkareport live testing.
+  Provisioned MSK cluster with IAM auth for kafkareport live testing.
   Creates: VPC, IGW, 1 public subnet (bastion), 2 private subnets (brokers),
-  customer KMS key, SCRAM secret, MSK cluster, bastion EC2 with SSM access.
+  MSK cluster, bastion EC2 with SSM access + kafka-cluster IAM perms.
 
   Heads up: MSK provisioned costs roughly $280+/month at this size
   (kafka.m7g.large × 2 brokers + storage). Tear down promptly:
@@ -11,19 +11,8 @@ Description: |
 Parameters:
   ClusterName:
     Type: String
-    Default: kafkareport-livetest
+    Default: kafkareport-livetest-iam
     Description: Used as a name prefix on most resources.
-
-  KafkaUsername:
-    Type: String
-    Default: kafkareport
-    MinLength: 1
-
-  KafkaPassword:
-    Type: String
-    NoEcho: true
-    MinLength: 12
-    Description: SCRAM password (12+ chars). You will need this for the conf file.
 
   KafkaVersion:
     Type: String
@@ -38,8 +27,7 @@ Parameters:
     Description: |
       MSK broker instance type. Smallest standard options are
       kafka.m7g.large (Graviton) and kafka.m5.large (Intel). MSK no
-      longer supports t-family. kafka.express.* is cheaper for spiky
-      workloads but bills differently (per-partition + traffic).
+      longer supports t-family.
 
   BastionAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
@@ -135,13 +123,13 @@ Resources:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
 
-  # Bastion can reach Kafka ports on brokers
+  # Bastion → brokers on IAM port 9098.
   BrokerIngressFromBastion:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       GroupId: !Ref BrokerSecurityGroup
       IpProtocol: tcp
-      FromPort: 9092
+      FromPort: 9098
       ToPort: 9098
       SourceSecurityGroupId: !Ref BastionSecurityGroup
 
@@ -152,29 +140,6 @@ Resources:
       GroupId: !Ref BrokerSecurityGroup
       IpProtocol: -1
       SourceSecurityGroupId: !Ref BrokerSecurityGroup
-
-  # Customer KMS key — MSK requires a CMK for SCRAM secrets (not aws/secretsmanager).
-  KmsKey:
-    Type: AWS::KMS::Key
-    Properties:
-      Description: !Sub ${ClusterName} SCRAM secret encryption
-      KeyPolicy:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: EnableIAMRoot
-            Effect: Allow
-            Principal:
-              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
-            Action: kms:*
-            Resource: '*'
-
-  # MSK requires SCRAM secret names to start with "AmazonMSK_".
-  ScramSecret:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      Name: !Sub AmazonMSK_${ClusterName}
-      KmsKeyId: !Ref KmsKey
-      SecretString: !Sub '{"username":"${KafkaUsername}","password":"${KafkaPassword}"}'
 
   Cluster:
     Type: AWS::MSK::Cluster
@@ -198,17 +163,9 @@ Resources:
           InCluster: true
       ClientAuthentication:
         Sasl:
-          Scram:
+          Iam:
             Enabled: true
 
-  ScramAssociation:
-    Type: AWS::MSK::BatchScramSecret
-    Properties:
-      ClusterArn: !Ref Cluster
-      SecretArnList:
-        - !Ref ScramSecret
-
-  # Bastion: tiny EC2 with SSM agent (no SSH needed).
   BastionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -221,6 +178,33 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: KafkaClusterAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kafka-cluster:Connect
+                  - kafka-cluster:DescribeCluster
+                  - kafka-cluster:AlterCluster
+                Resource: !Ref Cluster
+              - Effect: Allow
+                Action:
+                  - kafka-cluster:CreateTopic
+                  - kafka-cluster:DescribeTopic
+                  - kafka-cluster:AlterTopic
+                  - kafka-cluster:DeleteTopic
+                  - kafka-cluster:DescribeTopicDynamicConfiguration
+                  - kafka-cluster:AlterTopicDynamicConfiguration
+                  - kafka-cluster:WriteData
+                  - kafka-cluster:ReadData
+                Resource: !Sub arn:aws:kafka:${AWS::Region}:${AWS::AccountId}:topic/${ClusterName}/*/*
+              - Effect: Allow
+                Action:
+                  - kafka-cluster:AlterGroup
+                  - kafka-cluster:DescribeGroup
+                Resource: !Sub arn:aws:kafka:${AWS::Region}:${AWS::AccountId}:group/${ClusterName}/*/*
 
   BastionInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -255,9 +239,6 @@ Outputs:
     Description: |
       Get bootstrap brokers with:
       aws kafka get-bootstrap-brokers --cluster-arn <this>
-
-  SecretArn:
-    Value: !Ref ScramSecret
 
   BastionInstanceId:
     Value: !Ref Bastion
