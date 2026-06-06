@@ -75,7 +75,7 @@ def test_worker_error_surfaces(topic_ready, monkeypatch):
     but silent return of empty watermarks must fail.
     """
 
-    def boom(self, partition, result, index, **kwargs):
+    def boom(self, partition, **kwargs):
         raise RuntimeError("simulated worker failure")
 
     monkeypatch.setattr(KafkaReport, "_get_lo_hi", boom)
@@ -92,9 +92,9 @@ def test_workers_run_in_threads(topic_ready, monkeypatch):
     seen_threads = []
     original = KafkaReport._get_lo_hi
 
-    def spy(self, partition, result, index, **kwargs):
+    def spy(self, partition, **kwargs):
         seen_threads.append(threading.current_thread().ident)
-        return original(self, partition, result, index, **kwargs)
+        return original(self, partition, **kwargs)
 
     monkeypatch.setattr(KafkaReport, "_get_lo_hi", spy)
 
