@@ -26,7 +26,7 @@ format](https://docs.confluent.io/platform/current/clients/confluent-kafka-pytho
 
 Set `sasl.mechanism` to the sentinel `AWS_MSK_IAM` and drop the `sasl.username` / `sasl.password` keys. See [env-iam.json](https://github.com/newvoll/kafkareport/blob/main/tests/helper_files/env-iam.json) for a sample conf file.
 
-Credentials come from the default AWS chain (env, profile, instance profile). Region resolves from `AWS_REGION` / `AWS_DEFAULT_REGION` / `~/.aws/config`.
+Credentials come from the default AWS chain (env, profile, instance profile). Region resolves from `AWS_REGION` / `AWS_DEFAULT_REGION` / `~/.aws/config`. `KafkaReport(debug=True)`/`kafkareport -v` also enables the MSK signer's credential debug, which logs the AWS credentials being used to sign the OAUTHBEARER token, handy when access is denied.
 
 ## CLI
 
@@ -90,14 +90,13 @@ Testing runs against kafka/zookeper containers (plaintext only; no auth), as you
 
 `pytest` can use `--conf=/some/file.json` instead of default for localstack. This will manipulate pytest.topics on the kafka servers.
 
-See [Live testing against AWS MSK](https://github.com/newvoll/kafkareport/livetest/README.md) for details on how to quickly smoke test against actual clusters.
+See [Live testing against AWS MSK](https://github.com/newvoll/kafkareport/blob/main/livetest/README.md) for details on how to quickly smoke test against actual clusters.
 
 Occasionally, e.g. on laptop wake, the kafka container will be in a weird state. `docker compose down && docker compose up` always did the trick.
 
 # Addenda
 Watermarks use a thread for each topic partition, but it can still take a while. `-v` for gory details along the way, `KafkaReport(debug=True)` for the lib.
 
-This project started with [confluent_kafka](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#), but `DescribeLogDirsRequest` still isn't implemented in [confluent_kafka](https://github.com/confluentinc/confluent-kafka-python/issues/1179) or the underlying [librdkafka](https://github.com/confluentinc/librdkafka/issues/5333). [kafka-python](https://kafka-python.readthedocs.io/en/master/) has had a native `describe_log_dirs` since 2.1.0, but the stable 2.x signature can't target a specific broker — that landed on master/3.0.0.dev via [PR
-  #2881](https://github.com/dpkp/kafka-python/pull/2881). Until that ships, `logdirs.py` monkey-patches a per-broker wrapper onto `KafkaAdminClient.describe_log_dirs`.
+This project started with [confluent_kafka](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#), but `DescribeLogDirsRequest` still isn't implemented in [confluent_kafka](https://github.com/confluentinc/confluent-kafka-python/issues/1179) or the underlying [librdkafka](https://github.com/confluentinc/librdkafka/issues/5333). [kafka-python](https://kafka-python.readthedocs.io/en/master/) has had a native `describe_log_dirs` since 2.1.0, but the stable 2.x signature can't target a specific broker — that landed on master/3.0.0.dev via [PR #2881](https://github.com/dpkp/kafka-python/pull/2881). Until that ships, `logdirs.py` monkey-patches a per-broker wrapper onto `KafkaAdminClient.describe_log_dirs`.
 
 As a result, there is a janky confluent_kafka to kafka-python AdminClient conf map, now lifted into `kafkareport/auth.py` since IAM doubled its complexity. It handles plaintext, SCRAM, and the `AWS_MSK_IAM` sentinel (translated to `OAUTHBEARER` + an MSK signer-backed token provider for kafka-python and an `oauth_cb` for confluent_kafka).
