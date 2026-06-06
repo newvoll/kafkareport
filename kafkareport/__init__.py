@@ -121,10 +121,9 @@ class KafkaReport:
         partition: TopicPartition,
         timeout: int = _TIMEOUT,
     ) -> tuple[Message, Message]:
-        """Threaded partition watermarks. Modifies result[i] rather than return.
+        """Returns a partition's high and low watermarks
 
         :param partition: Partition for which to find message.
-        :param result: list of tuples to update with hi, lo marks.
         :param timeout: Seconds to wait for timeout.
         """
         conf = self.consumer_conf.copy()
@@ -174,9 +173,8 @@ class KafkaReport:
         :param results: A list of results fro _get_lo_hi
         :returns: { "earliest": datetime, "latest": datetime }
         """
-        logger.fatal(results)
-        earliests = [x[0] for x in results if x[0] and not x[0].error()]
-        latests = [x[1] for x in results if x[1] and not x[1].error()]
+        earliests = [x[0] for x in results if not x[0].error()]
+        latests = [x[1] for x in results if not x[1].error()]
         earliests.sort(key=lambda x: x.timestamp()[1])
         latests.sort(key=lambda x: x.timestamp()[1], reverse=True)
         early: datetime | str = ""
@@ -216,12 +214,10 @@ class KafkaReport:
             raise KafkaException(metadata.topics[topic].error)
         partitions = [TopicPartition(topic, p) for p in metadata.topics[topic].partitions]
         committed = consumer.committed(partitions, timeout=timeout)
-        results: list[tuple[Message, Message]] = [(None, None)] * len(committed)  # type: ignore[list-item]
+        results: list[tuple[Message, Message]] = []
         with ThreadPoolExecutor() as pool:
-            futures = [
-                pool.submit(self._get_lo_hi, partition, timeout=timeout) for partition in committed
-            ]
-        results.extend(completed.result() for completed in as_completed(futures))
+            futures = [pool.submit(self._get_lo_hi, p, timeout=timeout) for p in committed]
+            results.extend(completed.result() for completed in as_completed(futures))
         (early, late) = self._watermark_results(results, topic)
         consumer.close()
         return {"earliest": early, "latest": late}
