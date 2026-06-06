@@ -18,7 +18,7 @@ Both cost roughly **~$280+/month** at default size (`kafka.m7g.large` × 2 + sto
 
 ```sh
 STACK_NAME=kafkareport-livetest
-read -s KAFKA_PASSWORD  # type 12+ chars, then enter
+KAFKA_PASSWORD=$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 13); echo "$KAFKA_PASSWORD"
 
 aws cloudformation deploy \
   --stack-name "$STACK_NAME" \
@@ -59,7 +59,8 @@ BASTION_ID=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
 BROKERS=$(aws kafka get-bootstrap-brokers --cluster-arn "$CLUSTER_ARN" \
   --query BootstrapBrokerStringSaslScram --output text)
 
-cat > conf.json <<EOF
+cat <<EOF
+Copy this and paste into conf.json on the bastion host below:
 {
   "bootstrap.servers": "$BROKERS",
   "security.protocol": "SASL_SSL",
@@ -78,7 +79,8 @@ Note the `AWS_MSK_IAM` sentinel; no user/pass:
 BROKERS=$(aws kafka get-bootstrap-brokers --cluster-arn "$CLUSTER_ARN" \
   --query BootstrapBrokerStringSaslIam --output text)
 
-cat > conf.json <<EOF
+cat <<EOF
+Copy this and paste into conf.json on the bastion host below:
 {
   "bootstrap.servers": "$BROKERS",
   "sasl.mechanism": "AWS_MSK_IAM"
