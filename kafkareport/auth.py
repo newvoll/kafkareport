@@ -7,7 +7,7 @@ confluent_kafka, an ``AbstractTokenProvider`` subclass for kafka-python —
 both backed by ``aws-msk-iam-sasl-signer-python``.
 
 Credentials come from the default boto3 chain. Region is resolved from
-``boto3.Session().region_name`` (env, profile, IMDS) at config time so a
+``boto3.Session().region_name`` (env, profile) at config time so a
 missing region fails fast rather than mid-handshake.
 """
 
@@ -84,10 +84,6 @@ def kafka_python_conf(conf: dict[str, Any], debug: bool = False) -> dict[str, An
         kp_conf["security_protocol"] = "SASL_SSL"
         kp_conf["sasl_mechanism"] = "OAUTHBEARER"
         kp_conf["sasl_oauth_token_provider"] = _MSKTokenProvider(region, debug)
-        # MSK Serverless drops pre-SASL connections, so kafka-python's
-        # default ApiVersions probe loses every socket. Pin to skip it;
-        # 2.0.0 is the floor that supports OAUTHBEARER (KIP-255).
-        kp_conf["api_version"] = (2, 0, 0)
         return kp_conf
     try:
         kp_conf["sasl_plain_username"] = conf["sasl.username"]

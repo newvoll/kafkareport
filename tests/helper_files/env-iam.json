@@ -1,4 +1,4 @@
 {
-    "bootstrap.servers": boot-xxxx.kafka-serverless.us-east-1.amazonaws.com:9098,
+    "bootstrap.servers": boot-xxxx.c1.kafka.us-east-1.amazonaws.com:9098,
     "sasl.mechanism": "AWS_MSK_IAM"
 }

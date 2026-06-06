@@ -1,12 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: |
-  Serverless MSK cluster with IAM auth for kafkareport live testing.
-  Creates: VPC, IGW, 1 public subnet (bastion), 2 private subnets (cluster),
-  serverless MSK cluster, bastion EC2 with SSM access + kafka-cluster IAM perms.
+  Provisioned MSK cluster with IAM auth for kafkareport live testing.
+  Creates: VPC, IGW, 1 public subnet (bastion), 2 private subnets (brokers),
+  MSK cluster, bastion EC2 with SSM access + kafka-cluster IAM perms.
 
-  Heads up: MSK Serverless is much cheaper than provisioned (no broker fee,
-  pay per-partition-hour + ingress/egress), but still costs money — and the
-  per-partition floor means an idle cluster isn't free. Tear down promptly:
+  Heads up: MSK provisioned costs roughly $280+/month at this size
+  (kafka.m7g.large × 2 brokers + storage). Tear down promptly:
   `aws cloudformation delete-stack --stack-name <name>`.
 
 Parameters:
@@ -14,6 +13,21 @@ Parameters:
     Type: String
     Default: kafkareport-livetest-iam
     Description: Used as a name prefix on most resources.
+
+  KafkaVersion:
+    Type: String
+    Default: 3.7.x.kraft
+    Description: |
+      MSK Kafka version. If deploy fails on this, run
+      `aws kafka list-kafka-versions` and pick a supported one.
+
+  BrokerInstanceType:
+    Type: String
+    Default: kafka.m7g.large
+    Description: |
+      MSK broker instance type. Smallest standard options are
+      kafka.m7g.large (Graviton) and kafka.m5.large (Intel). MSK no
+      longer supports t-family.
 
   BastionAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
@@ -94,10 +108,10 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet
 
-  ClusterSecurityGroup:
+  BrokerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub ${ClusterName} MSK Serverless
+      GroupDescription: !Sub ${ClusterName} MSK brokers
       VpcId: !Ref Vpc
 
   BastionSecurityGroup:
@@ -109,26 +123,44 @@ Resources:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
 
-  # Bastion → cluster on IAM port 9098.
-  ClusterIngressFromBastion:
+  # Bastion → brokers on IAM port 9098.
+  BrokerIngressFromBastion:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
-      GroupId: !Ref ClusterSecurityGroup
+      GroupId: !Ref BrokerSecurityGroup
       IpProtocol: tcp
       FromPort: 9098
       ToPort: 9098
       SourceSecurityGroupId: !Ref BastionSecurityGroup
 
+  # Brokers talk to each other within the SG
+  BrokerIngressSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BrokerSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref BrokerSecurityGroup
+
   Cluster:
-    Type: AWS::MSK::ServerlessCluster
+    Type: AWS::MSK::Cluster
     Properties:
       ClusterName: !Ref ClusterName
-      VpcConfigs:
-        - SubnetIds:
-            - !Ref PrivateSubnetA
-            - !Ref PrivateSubnetB
-          SecurityGroups:
-            - !Ref ClusterSecurityGroup
+      KafkaVersion: !Ref KafkaVersion
+      NumberOfBrokerNodes: 2
+      BrokerNodeGroupInfo:
+        InstanceType: !Ref BrokerInstanceType
+        ClientSubnets:
+          - !Ref PrivateSubnetA
+          - !Ref PrivateSubnetB
+        SecurityGroups:
+          - !Ref BrokerSecurityGroup
+        StorageInfo:
+          EBSStorageInfo:
+            VolumeSize: 100
+      EncryptionInfo:
+        EncryptionInTransit:
+          ClientBroker: TLS
+          InCluster: true
       ClientAuthentication:
         Sasl:
           Iam:
@@ -217,5 +249,5 @@ Outputs:
   VpcId:
     Value: !Ref Vpc
 
-  ClusterSecurityGroupId:
-    Value: !Ref ClusterSecurityGroup
+  BrokerSecurityGroupId:
+    Value: !Ref BrokerSecurityGroup

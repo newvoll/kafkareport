@@ -1,21 +1,26 @@
 # Live test against real MSK
 
-A throwaway MSK cluster + bastion for verifying `kafkareport` end-to-end before
-publishing. Two flavors, picked by which CFN template you deploy:
+A throwaway MSK provisioned cluster + bastion for verifying `kafkareport`
+end-to-end before publishing. Two flavors, picked by which CFN template
+you deploy:
 
-| Mode | Template | Auth | Cost (approx) |
-| --- | --- | --- | --- |
-| Provisioned | `msk.yaml` | SASL/SCRAM | **~$280+/month** at default size (`kafka.m7g.large` × 2 + storage) |
-| Serverless | `msk-iam.yaml` | IAM (`AWS_MSK_IAM`) | Per-partition-hour + traffic, no broker fee. Cheaper than provisioned, **not free** — an idle cluster still bills. |
+| Auth | Template | Cluster |
+| --- | --- | --- |
+| SASL/SCRAM | `msk.yaml` | Provisioned |
+| IAM (`AWS_MSK_IAM`) | `msk-iam.yaml` | Provisioned |
 
-**Tear it down when you're done either way.**
+Both cost roughly **~$280+/month** at default size (`kafka.m7g.large` × 2
++ storage). **Tear it down when you're done either way.**
+
+MSK Serverless is not supported by `kafkareport` — it doesn't expose
+`DescribeLogDirs`, which is the entire basis of the size report.
 
 > [!WARNING]
 > LLM-created for throwaway smoke tests. Use only on nonproduction accounts.
 
 ## Deploy
 
-### Provisioned (SCRAM)
+### SCRAM
 
 ```sh
 aws cloudformation deploy \
@@ -27,9 +32,7 @@ aws cloudformation deploy \
       KafkaPassword='<pick a 12+ char password>'
 ```
 
-MSK provisioning takes 15–25 minutes.
-
-### Serverless (IAM)
+### IAM
 
 ```sh
 aws cloudformation deploy \
@@ -38,7 +41,7 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_IAM
 ```
 
-Serverless provisioning is usually faster (a few minutes).
+MSK provisioning takes 15–25 minutes either way.
 
 ## Grab the outputs
 
@@ -51,16 +54,12 @@ You'll get a `ClusterArn` and a `BastionInstanceId` from either stack.
 
 ## Build the conf file
 
-### Provisioned (SCRAM)
-
-Get the SASL/SCRAM bootstrap broker string:
+### SCRAM
 
 ```sh
 aws kafka get-bootstrap-brokers --cluster-arn <ClusterArn> \
   --query BootstrapBrokerStringSaslScram --output text
 ```
-
-Make a `conf.json`:
 
 ```json
 {
@@ -72,16 +71,14 @@ Make a `conf.json`:
 }
 ```
 
-### Serverless (IAM)
-
-Get the IAM bootstrap broker string:
+### IAM
 
 ```sh
 aws kafka get-bootstrap-brokers --cluster-arn <ClusterArn> \
   --query BootstrapBrokerStringSaslIam --output text
 ```
 
-Make a `conf.json` — note the `AWS_MSK_IAM` sentinel; no user/pass:
+Note the `AWS_MSK_IAM` sentinel; no user/pass:
 
 ```json
 {
@@ -92,14 +89,13 @@ Make a `conf.json` — note the `AWS_MSK_IAM` sentinel; no user/pass:
 
 Credentials come from the default AWS chain. On the bastion that's the
 instance profile (which the IAM stack grants `kafka-cluster:*` on the
-cluster's topics and groups). Region is exported into the bastion's
-shell at launch by user-data, so `AWS_REGION` is already set when you
-SSM in.
+cluster's topics and groups). Region is exported into the bastion's shell
+at launch by user-data, so `AWS_REGION` is already set when you SSM in.
 
 ## Run from the bastion
 
-The MSK brokers / serverless endpoints live in private subnets. Easiest way in
-is the bastion the stack provisioned, via SSM (no SSH key needed):
+The MSK brokers live in private subnets. Easiest way in is the bastion the
+stack provisioned, via SSM (no SSH key needed):
 
 ```sh
 aws ssm start-session --target <BastionInstanceId>

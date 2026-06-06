@@ -25,9 +25,10 @@ except for `group.id`. It is automatically set. See
 for a sample conf file.
 
 > [!NOTE]
-> Tested only with `SASL_SSL` + `SCRAM_SHA_512` u/p on AWS MSK
-> provisioned, and `AWS_MSK_IAM` on MSK Serverless. See
-> [Addenda](#Addenda) for details.
+> Tested only with `SASL_SSL` + `SCRAM_SHA_512` u/p and with
+> `AWS_MSK_IAM` on AWS MSK provisioned. MSK Serverless is not
+> supported — it doesn't expose `DescribeLogDirs`, which the size
+> report depends on. See [Addenda](#Addenda) for details.
 
 ### AWS MSK IAM
 
@@ -36,7 +37,7 @@ Set `sasl.mechanism` to the sentinel `AWS_MSK_IAM` and drop the
 
 ```json
 {
-    "bootstrap.servers": "boot-xxxx.kafka-serverless.us-east-1.amazonaws.com:9098",
+    "bootstrap.servers": "boot-xxxx.c1.kafka.us-east-1.amazonaws.com:9098",
     "sasl.mechanism": "AWS_MSK_IAM"
 }
 ```
@@ -147,5 +148,4 @@ localstack. This will manipulate pytest.topics on the kafka servers.
     `AWS_MSK_IAM` sentinel (translated to `OAUTHBEARER` + an MSK
     signer-backed token provider for kafka-python and an `oauth_cb`
     for confluent_kafka). Tested manually against MSK provisioned
-    (SCRAM) and MSK Serverless (IAM); CI runs against plaintext docker
-    only.
+    with both SCRAM and IAM; CI runs against plaintext docker only.
