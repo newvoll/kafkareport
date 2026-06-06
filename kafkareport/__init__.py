@@ -2,8 +2,8 @@
 
 import logging
 import sys
-import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from typing import Any
 
@@ -119,15 +119,11 @@ class KafkaReport:
     def _get_lo_hi(
         self,
         partition: TopicPartition,
-        result: list[tuple],
-        index: int,
         timeout: int = _TIMEOUT,
-    ) -> None:
-        """Threaded partition watermarks. Modifies result[i] rather than return.
+    ) -> tuple[Message, Message]:
+        """Returns a partition's high and low watermarks
 
         :param partition: Partition for which to find message.
-        :param result: list of tuples to update with hi, lo marks.
-        :param index: index of the result list to update.
         :param timeout: Seconds to wait for timeout.
         """
         conf = self.consumer_conf.copy()
@@ -143,7 +139,7 @@ class KafkaReport:
         latest = message
         consumer.close()
         logger.debug("%s: %s-%s", partition, minnie, maxie)
-        result[index] = (earliest, latest)
+        return (earliest, latest)
 
     def retentions(self, topic: str, timeout: int = _TIMEOUT) -> dict[str, int]:
         """Retrieves the retention settings for given topic.
@@ -218,20 +214,10 @@ class KafkaReport:
             raise KafkaException(metadata.topics[topic].error)
         partitions = [TopicPartition(topic, p) for p in metadata.topics[topic].partitions]
         committed = consumer.committed(partitions, timeout=timeout)
-        threads = []
-        results: list[tuple[Message, Message]] = [(None, None)] * len(committed)  # type: ignore[list-item]
-        logger.debug("%s threads launching for %s", len(committed), topic)
-        for i, partition in enumerate(committed):
-            logger.debug(partition)
-            thread = threading.Thread(
-                target=self._get_lo_hi,
-                args=(partition, results, i),
-                kwargs={"timeout": timeout},
-            )
-            threads.append(thread)
-            thread.start()
-        for thread in threads:
-            thread.join()
+        results: list[tuple[Message, Message]] = []
+        with ThreadPoolExecutor() as pool:
+            futures = [pool.submit(self._get_lo_hi, p, timeout=timeout) for p in committed]
+            results.extend(f.result() for f in as_completed(futures))
         (early, late) = self._watermark_results(results, topic)
         consumer.close()
         return {"earliest": early, "latest": late}
