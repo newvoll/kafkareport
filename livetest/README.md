@@ -1,42 +1,41 @@
 # Live test against real MSK
 
-A throwaway MSK provisioned cluster + bastion for verifying `kafkareport`
-end-to-end before publishing. Two flavors, picked by which CFN template
-you deploy:
+> [!WARNING]
+> LLM-created for throwaway smoke tests. Use only on nonproduction accounts.
+
+A throwaway MSK provisioned cluster + bastion for verifying `kafkareport` end-to-end before publishing. Two flavors, picked by which CFN template you deploy:
 
 | Auth | Template | Cluster |
 | --- | --- | --- |
 | SASL/SCRAM | `msk.yaml` | Provisioned |
 | IAM (`AWS_MSK_IAM`) | `msk-iam.yaml` | Provisioned |
 
-Both cost roughly **~$280+/month** at default size (`kafka.m7g.large` × 2
-+ storage). **Tear it down when you're done either way.**
-
-MSK Serverless is not supported by `kafkareport` — it doesn't expose
-`DescribeLogDirs`, which is the entire basis of the size report.
-
-> [!WARNING]
-> LLM-created for throwaway smoke tests. Use only on nonproduction accounts.
+Both cost roughly **~$280+/month** at default size (`kafka.m7g.large` × 2 + storage). **Tear it down when you're done either way.**
 
 ## Deploy
 
 ### SCRAM
 
 ```sh
+STACK_NAME=kafkareport-livetest
+read -s KAFKA_PASSWORD  # type 12+ chars, then enter
+
 aws cloudformation deploy \
-  --stack-name kafkareport-livetest \
+  --stack-name "$STACK_NAME" \
   --template-file livetest/msk.yaml \
   --capabilities CAPABILITY_IAM \
   --parameter-overrides \
       KafkaUsername=kafkareport \
-      KafkaPassword='<pick a 12+ char password>'
+      KafkaPassword="$KAFKA_PASSWORD"
 ```
 
 ### IAM
 
 ```sh
+STACK_NAME=kafkareport-livetest-iam
+
 aws cloudformation deploy \
-  --stack-name kafkareport-livetest-iam \
+  --stack-name "$STACK_NAME" \
   --template-file livetest/msk-iam.yaml \
   --capabilities CAPABILITY_IAM
 ```
@@ -46,45 +45,45 @@ MSK provisioning takes 15–25 minutes either way.
 ## Grab the outputs
 
 ```sh
-aws cloudformation describe-stacks --stack-name <your-stack-name> \
-  --query 'Stacks[0].Outputs' --output table
+CLUSTER_ARN=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='ClusterArn'].OutputValue" --output text)
+BASTION_ID=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+  --query "Stacks[0].Outputs[?OutputKey=='BastionInstanceId'].OutputValue" --output text)
 ```
-
-You'll get a `ClusterArn` and a `BastionInstanceId` from either stack.
 
 ## Build the conf file
 
 ### SCRAM
 
 ```sh
-aws kafka get-bootstrap-brokers --cluster-arn <ClusterArn> \
-  --query BootstrapBrokerStringSaslScram --output text
-```
+BROKERS=$(aws kafka get-bootstrap-brokers --cluster-arn "$CLUSTER_ARN" \
+  --query BootstrapBrokerStringSaslScram --output text)
 
-```json
+cat > conf.json <<EOF
 {
-  "bootstrap.servers": "<the BootstrapBrokerStringSaslScram value>",
+  "bootstrap.servers": "$BROKERS",
   "security.protocol": "SASL_SSL",
   "sasl.mechanism": "SCRAM-SHA-512",
   "sasl.username": "kafkareport",
-  "sasl.password": "<the password you set>"
+  "sasl.password": "$KAFKA_PASSWORD"
 }
+EOF
 ```
 
 ### IAM
 
-```sh
-aws kafka get-bootstrap-brokers --cluster-arn <ClusterArn> \
-  --query BootstrapBrokerStringSaslIam --output text
-```
-
 Note the `AWS_MSK_IAM` sentinel; no user/pass:
 
-```json
+```sh
+BROKERS=$(aws kafka get-bootstrap-brokers --cluster-arn "$CLUSTER_ARN" \
+  --query BootstrapBrokerStringSaslIam --output text)
+
+cat > conf.json <<EOF
 {
-  "bootstrap.servers": "<the BootstrapBrokerStringSaslIam value>",
+  "bootstrap.servers": "$BROKERS",
   "sasl.mechanism": "AWS_MSK_IAM"
 }
+EOF
 ```
 
 Credentials come from the default AWS chain. On the bastion that's the
@@ -98,7 +97,7 @@ The MSK brokers live in private subnets. Easiest way in is the bastion the
 stack provisioned, via SSM (no SSH key needed):
 
 ```sh
-aws ssm start-session --target <BastionInstanceId>
+aws ssm start-session --target "$BASTION_ID"
 ```
 
 On the bastion (user-data installs `git`, `python3.14`, and `pip3.14` at
@@ -122,7 +121,7 @@ before the producer/admin client are built.
 ## Teardown
 
 ```sh
-aws cloudformation delete-stack --stack-name <your-stack-name>
+aws cloudformation delete-stack --stack-name "$STACK_NAME"
 ```
 
 This deletes the cluster, bastion, VPC, and (for SCRAM) the KMS key and
